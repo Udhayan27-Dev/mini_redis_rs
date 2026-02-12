@@ -71,4 +71,23 @@ fn parse_simple_string(buffer: &[u8], index: &mut usize) -> RESPResult<RESP> {
     Ok(RESP::SimpleString(line))
 }
 
+fn parse_router(buffer:&[u8],index:&mut usize) -> Option<fn(&[u8],&mut usize) -> RESPResult<RESP>>{
+    match buffer[*index]{
+        b'+' => Some(parse_simple_string),
+        _ => None,
+    }
+}
+
+pub fn bytes_to_resp(buffer:&[u8],index:&mut usize) ->  RESPResult<RESP>{
+    match parse_router(buffer,index){
+        Some(parse_func) => {
+            let result:RESP = parse_func(buffer,index)?;
+            Ok(result)
+        }
+        None => Err(RESPError::Unknown),
+    }
+}
+
+
+
 
