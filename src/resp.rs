@@ -1,8 +1,18 @@
 use crate::resp_result::{RESPError, RESPResult};
+use std::fmt;
 
-#[derive(Debug,PartialEq)]
-pub enum RESP{
+#[derive(Debug, PartialEq)]
+pub enum RESP {
     SimpleString(String),
+}
+
+impl fmt::Display for RESP{
+    fn fmt(&self,f:&mut fmt::Formatter<'_>) -> fmt::Result{
+        let data = match self{
+            Self::SimpleString(data) => format!("+{}\r\n",data),
+        };
+        write!(f,"{data}")
+    }
 }
 
 pub fn binary_extract_line(buffer: &[u8], index: &mut usize) -> RESPResult<Vec<u8>> {
@@ -47,16 +57,18 @@ pub fn binary_extract_line_as_string(buffer: &[u8], index: &mut usize) -> RESPRe
     Ok(String::from_utf8(line)?)
 }
 
-pub fn resp_remove_type(value:char,buffer:&[u8],index:&mut usize)-> RESPResult<()>{
-    if buffer[*index] != value as u8{
-        return Err(RESPError::WrongType)
+pub fn resp_remove_type(value: char, buffer: &[u8], index: &mut usize) -> RESPResult<()> {
+    if buffer[*index] != value as u8 {
+        return Err(RESPError::WrongType);
     }
     *index += 1;
     Ok(())
 }
 
-fn parse_simple_string(buffer:&[u8],index:&mut usize ) -> RESPResult<RESP>{
-    resp_remove_type('+',buffer,index)?;
+fn parse_simple_string(buffer: &[u8], index: &mut usize) -> RESPResult<RESP> {
+    resp_remove_type('+', buffer, index)?;
     let line: String = binary_extract_line_as_string(buffer, index)?;
     Ok(RESP::SimpleString(line))
 }
+
+
