@@ -1,4 +1,4 @@
-use crate::resp_result::{RESPError, RESPResult};
+use crate::resp_result::{RESPError, RESPResult,RESPLength};
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
@@ -74,20 +74,44 @@ pub fn resp_remove_type(value: char, buffer: &[u8], index: &mut usize) -> RESPRe
     Ok(())
 }
 
-//3.if the type of the RESP,this func handles the bytes and process it to the String
+//3.if the type of the RESP is simple string,this func handles the bytes and process it to the String
 fn parse_simple_string(buffer: &[u8], index: &mut usize) -> RESPResult<RESP> {
     resp_remove_type('+', buffer, index)?;
     let line: String = binary_extract_line_as_string(buffer, index)?;
     Ok(RESP::SimpleString(line))
 }
 
+//3.1 if the type of RESP is bulk string,this func process the bytes and process it to the string
+fn parse_bulk_string(buffer:&[u8],index:&mut usize) -> RESPResult<RESP>{
+    resp_remove_type('$', buffer, index)?;
+    
+    let length = resp_extract_length(buffer,index)?;
+    
+    if length == -1{
+        return Ok(RESP::Null);
+    }
+    
+    if length < -1{
+        return Err(RESPError::IncorrectLength(length));
+    }
+    
+    let bytes = binary_extract_bytes(buffer,index,length as usize)?;
+    let data:String = String::from_utf8(bytes)?;
+    
+    *index += 2;
+    Ok(RESP::BulkString(data))
+    
+}
+
 //2.Checks the type of the RESP from the client and routes the bytes to the func that handles the type. 
 fn parse_router(buffer:&[u8],index:&mut usize) -> Option<fn(&[u8],&mut usize) -> RESPResult<RESP>>{
     match buffer[*index]{
         b'+' => Some(parse_simple_string),
+        b'$' => Some(parse_bulk_string),
         _ => None,
     }
 }
+
 
 //1.gets the bytes from the client and sends it to the router
 pub fn bytes_to_resp(buffer:&[u8],index:&mut usize) ->  RESPResult<RESP>{
@@ -111,7 +135,14 @@ fn binary_extract_bytes(buffer: &[u8],index: &mut usize,length:usize) -> RESPRes
     output.extend_from_slice(&buffer[*index..*index + length]);
     
     *index += length;
-    Ok(output)
-    
+    Ok(output)   
 }
+
+//This func is for the bulk string($5/r/nhello/r/n) to extarct the lenght of the data
+pub fn resp_extract_length(buffer: &[u8],index:&mut usize) ->RESPResult<RESPLength> {
+    let line:String = binary_extract_line_as_string(buffer, index)?;
+    let length:RESPLength = line.parse()?;
+    Ok(length)
+}
+
 
